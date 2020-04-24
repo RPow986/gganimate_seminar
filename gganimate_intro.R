@@ -104,9 +104,14 @@ anim_save(
 	res = 300
 )
 
+# Trying it out for real ----
+
+## Get some weather data
+## and make the station names be ordered by state
 weather <- read_csv("data/weather_data.csv") %>% 
 	mutate(name = fct_reorder(name, state, .fun = unique))
 
+## Create the base barplot for animation
 bars <- ggplot(weather, aes(x = month, y = rainfall, fill = rainfall, group = 1L)) +
 	scale_fill_viridis_c() +
 	scale_x_continuous(breaks = 1:12, labels = month.abb) + 
@@ -123,16 +128,18 @@ bars <- ggplot(weather, aes(x = month, y = rainfall, fill = rainfall, group = 1L
 		y = "Average rainfall (mm)"
 		) 
 
-# Need a little cheat to get the static bar plot looking nice but
-# the animation working correctly
+## Need a little cheat to get the static bar plot looking nice but
+## the animation working correctly
 bars_for_static <- bars +
 	geom_col(aes(group = name),position = position_dodge())
 
 ggsave(filename = "figures/01-bars.png", bars_for_static, width = 5, height = 5, dpi = 300)
 
-# Now can add the bars to the animatable version
+## Now can add the bars to the animatable version
 bars <- bars + geom_col()
-	
+
+## Make a lineplot that we ended up cutting from the slides :(
+
 lines <- ggplot(weather, aes(x = month, y = rainfall, colour = state, group = name)) +
 	geom_line() +
 	scale_color_ipsum() +
@@ -153,6 +160,7 @@ lines <- ggplot(weather, aes(x = month, y = rainfall, colour = state, group = na
 
 ggsave(filename = "figures/02-lines.png", lines, width = 5, height = 5.5, dpi = 300)
 
+## Make the base scatter plot for animation 
 points <- ggplot(weather, aes(x = temp_min, y = temp_max, size = solar, colour = state)) +
 	geom_point() +
 	scale_colour_ipsum() +
@@ -168,36 +176,130 @@ points <- ggplot(weather, aes(x = temp_min, y = temp_max, size = solar, colour =
 	
 ggsave(filename = "figures/03-points.png", points, width = 6, height = 5, dpi = 300)
 
-# What to animate
-map2(1:10, 1:10,  
-		 ~ggsave(filename = glue::glue("figures/04-transitions_{.x}.png"), plot = ggplot(tibble(x = .x, y = .y), aes(x,y)) +
-			 	geom_point(size = 3) +
-			 	cowplot::theme_half_open() +
-			 	scale_x_continuous(breaks = 1:10, limits = c(1,10)) +
-			 	scale_y_continuous(breaks = 1:10, limits = c(1,10)),
-			 	width = 3, height = 3
-		 )
-)
+# What to animate ----
+
+## Individual steps from 1,1 to 10,10
+plot_xy <- function(x, y) {
+	p <- ggplot(tibble(x = x, y = y), aes(x,y)) +
+		geom_point(size = 3) +
+		cowplot::theme_half_open() +
+		scale_x_continuous(breaks = 1:10, limits = c(1,10)) +
+		scale_y_continuous(breaks = 1:10, limits = c(1,10))
+	
+	ggsave(filename = glue::glue("figures/04-transitions_{x}.png"), plot = p, width = 3, height = 3)
+}
+
+## save frames for transition
+walk2(1:10, 1:10, plot_xy)
 	
 
-# Transitions
+# Transitions ----
+
+## Facet comparison
 ggsave("figures/05-bars_facet.png", bars + facet_wrap(~name), width = 14, height = 7)
 
-anim_save("animations/04_bars_transition.gif", animation = bars +
-	transition_states(name) + labs(subtitle = "{closest_state}"), fps = 20, duration = 15, detail = 3, width = 1200, height = 1200, type = "cairo-png", res = 200)
+## Animate between states for the barplot
+anim_save(
+	filename = "animations/04_bars_transition.gif", 
+	animation = bars +	transition_states(name) + labs(subtitle = "{closest_state}"), 
+	fps = 20, 
+	duration = 15, 
+	detail = 3, 
+	width = 1200, 
+	height = 1200, 
+	type = "cairo-png", 
+	res = 200
+)
 
-anim_save("animations/05-points_transition.gif", animation = points + transition_time(month) + labs(subtitle = "{month.name[{frame_time}]}"), fps = 20, duration = 10, detail = 3, width = 1200, height = 1000, res = 200, type = "cairo-png")
+## Animate using transition_time for the point plot
+## transition_time not strictly necessary here because of the regular interval
 
-#Context
+anim_save(
+	filename = "animations/05-points_transition.gif", 
+	animation = points + transition_time(month) + labs(subtitle = "{month.name[{frame_time}]}"),
+	fps = 20, 
+	duration = 10, 
+	detail = 3, 
+	width = 1200, 
+	height = 1000, 
+	res = 200, 
+	type = "cairo-png"
+)
+
+# Context -----
+
+## Points facet plot for discussing contect in animation
 ggsave("figures/06-points_facet.png", points + facet_wrap(~month, nrow = 2), width = 10, height = 5)
 
-anim_save("animations/06-points_shadow.gif", animation = points + transition_time(month) + shadow_wake(wake_length = 0.2, wrap = F) + labs(subtitle = "{month.name[{frame_time}]}"), fps = 20, duration = 10, detail = 3, width = 1200, height = 1000, res = 200, type = "cairo-png")
+## Add a wake to the points plot
+points_shadow <- points + 
+	transition_time(month) + shadow_wake(wake_length = 0.2, wrap = F) + 
+	labs(subtitle = "{month.name[{frame_time}]}")
 
-anim_save("animations/07_bars_shadow.gif", animation = bars +
-						transition_states(name) + shadow_mark(past = TRUE, future = TRUE, fill = "grey70") + labs(subtitle = "{closest_state}"), fps = 20, duration = 15, detail = 3, width = 1200, height = 1200, type = "cairo-png", res = 200)
+anim_save(
+	filename = "animations/06-points_shadow.gif", 
+	animation = points_shadow, 
+	fps = 20, 
+	duration = 10, 
+	detail = 3, 
+	width = 1200, 
+	height = 1000, 
+	res = 200, 
+	type = "cairo-png"
+)
 
-# Easings
-anim_save("animations/08-points_easing.gif", animation = points + transition_time(month) + ease_aes("cubic-in-out") + labs(subtitle = "{month.name[{frame_time}]}"), fps = 20, duration = 10, detail = 3, width = 1200, height = 1000, res = 200, type = "cairo-png")
+## Now use shadow_mark to show the max rainfall
+bars_shadow <- bars +
+	transition_states(name) + 
+	shadow_mark(past = TRUE, future = TRUE, fill = "grey70") + 
+	labs(subtitle = "{closest_state}")
 
-anim_save("animations/09_bars_easing.gif", animation = bars +
-						transition_states(name) + ease_aes("back-in") + labs(subtitle = "{closest_state}"), fps = 30, duration = 15, detail = 3, width = 1200, height = 1200, type = "cairo-png", res = 200)
+anim_save(
+	filename = "animations/07_bars_shadow.gif", 
+	animation = bars_shadow, 
+	fps = 20, 
+	duration = 15, 
+	detail = 3, 
+	width = 1200, 
+	height = 1200, 
+	type = "cairo-png", 
+	res = 200
+)
+
+# Easings -----
+
+## Add an easing to the points plot
+points_easing <- points + 
+	transition_time(month) + 
+	ease_aes("cubic-in-out") + 
+	labs(subtitle = "{month.name[{frame_time}]}")
+
+anim_save(
+	filename = "animations/08-points_easing.gif", 
+	animation = points_easing, 
+	fps = 20, 
+	duration = 10, 
+	detail = 3, 
+	width = 1200, 
+	height = 1000, 
+	res = 200, 
+	type = "cairo-png"
+)
+
+## Now for the bars
+bars_easing <- bars +
+	transition_states(name) + 
+	ease_aes("back-in") + 
+	labs(subtitle = "{closest_state}")
+
+anim_save(
+	filename = "animations/09_bars_easing.gif", 
+	animation = bars_easing, 
+	fps = 30, 
+	duration = 15, 
+	detail = 3, 
+	width = 1200, 
+	height = 1200, 
+	type = "cairo-png", 
+	res = 200
+)
