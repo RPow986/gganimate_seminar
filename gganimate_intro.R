@@ -77,21 +77,32 @@ anim_save(
 	res = 300
 )
 
+# Make a line of points rise in a wave pattern
 line_wave <- tibble(x = rep(1:20, times = 24), step = rep(-1:22, each = 20)) %>% 
-	mutate(y = as.numeric(x==step)) %>% 
+	mutate(y = as.numeric(x == step)) %>% 
 	group_by(step) %>% 
 	mutate(y = ifelse(lead(y, default = 0) == 1 | lag(y, default = 0) == 1 , 0.5, y)) 
 
-# a few manual fixups at the margins 
+# a few manual fixups at the margins of the animation 
 line_wave[21,3] <- 0.5
 line_wave[nrow(d)-20, 3] <- 0.5
 	
 line_wave_anim <- ggplot(line_wave, aes(x,y, group = x)) + 
 	geom_point() + 
 	transition_time(step) +
-	theme_nothing()
+	cowplot::theme_nothing()
 	
-anim_save(filename = "animations/03_line_wave.gif", animation = line_wave_anim, nframes = 300, duration = 10, detail = 3, width = 1600, height = 500, type = "cairo-png", res = 300)
+anim_save(
+	filename = "animations/03_line_wave.gif", 
+	animation = line_wave_anim, 
+	nframes = 300, 
+	duration = 10, 
+	detail = 3, 
+	width = 1600, 
+	height = 500, 
+	type = "cairo-png", 
+	res = 300
+)
 
 weather <- read_csv("data/weather_data.csv") %>% 
 	mutate(name = fct_reorder(name, state, .fun = unique))
